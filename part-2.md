@@ -38,3 +38,120 @@ Algumas classes de Field possuem elementos obrigatórios. O CharField, por exemp
 Um Field pode ter vários argumentos opcionais; neste caso, definimos o valor default de votes para 0.
 
 Finalmente, note que uma relação foi criada, usando ForeignKey. Isso diz ao Django que cada Choice está relacionada a uma única Question. O Django oferece suporte para todos os relacionamentos comuns de um banco de dados: muitos-para-um, muitos-para-muitos e um-para-um.
+
+
+### ToSring da classe
+
+É importante adicionar métodos __str__() aos seus modelos, não apenas para sua própria conveniência quando estiver lidando com o prompt interativo, mas também porque representações de objetos são usadas por todo interface administrativa gerada automaticamente pelo Django.
+
+Vamos também adicionar um método personalizado a este modelo:
+
+```python
+def was_published_recently(self):
+	return self.pub_date >= timezone.now() - datetime.timedelta(days=1)
+
+```
+
+
+```python
+>>> from polls.models import Choice, Question
+
+# Make sure our __str__() addition worked.
+>>> Question.objects.all()
+<QuerySet [<Question: What's up?>]>
+
+# Django provides a rich database lookup API that's entirely driven by
+# keyword arguments.
+>>> Question.objects.filter(id=1)
+<QuerySet [<Question: What's up?>]>
+>>> Question.objects.filter(question_text__startswith="What")
+<QuerySet [<Question: What's up?>]>
+
+# Get the question that was published this year.
+>>> from django.utils import timezone
+>>> current_year = timezone.now().year
+>>> Question.objects.get(pub_date__year=current_year)
+<Question: What's up?>
+
+# Request an ID that doesn't exist, this will raise an exception.
+>>> Question.objects.get(id=2)
+Traceback (most recent call last):
+    ...
+DoesNotExist: Question matching query does not exist.
+
+# Lookup by a primary key is the most common case, so Django provides a
+# shortcut for primary-key exact lookups.
+# The following is identical to Question.objects.get(id=1).
+>>> Question.objects.get(pk=1)
+<Question: What's up?>
+
+# Make sure our custom method worked.
+>>> q = Question.objects.get(pk=1)
+>>> q.was_published_recently()
+True
+
+# Give the Question a couple of Choices. The create call constructs a new
+# Choice object, does the INSERT statement, adds the choice to the set
+# of available choices and returns the new Choice object. Django creates
+# a set to hold the "other side" of a ForeignKey relation
+# (e.g. a question's choice) which can be accessed via the API.
+>>> q = Question.objects.get(pk=1)
+
+# Display any choices from the related object set -- none so far.
+>>> q.choice_set.all()
+<QuerySet []>
+
+# Create three choices.
+>>> q.choice_set.create(choice_text="Not much", votes=0)
+<Choice: Not much>
+>>> q.choice_set.create(choice_text="The sky", votes=0)
+<Choice: The sky>
+>>> c = q.choice_set.create(choice_text="Just hacking again", votes=0)
+
+# Choice objects have API access to their related Question objects.
+>>> c.question
+<Question: What's up?>
+
+# And vice versa: Question objects get access to Choice objects.
+>>> q.choice_set.all()
+<QuerySet [<Choice: Not much>, <Choice: The sky>, <Choice: Just hacking again>]>
+>>> q.choice_set.count()
+3
+
+# The API automatically follows relationships as far as you need.
+# Use double underscores to separate relationships.
+# This works as many levels deep as you want; there's no limit.
+# Find all Choices for any question whose pub_date is in this year
+# (reusing the 'current_year' variable we created above).
+>>> Choice.objects.filter(question__pub_date__year=current_year)
+<QuerySet [<Choice: Not much>, <Choice: The sky>, <Choice: Just hacking again>]>
+
+# Let's delete one of the choices. Use delete() for that.
+>>> c = q.choice_set.filter(choice_text__startswith="Just hacking")
+>>> c.delete()
+```
+
+
+### Admin django
+
+Filosofia
+
+Gerar um site de administração para sua equipe ou clientes para adicionar, alterar, e deletar conteúdo é uma tarefa tediosa que não requer muita criatividade. Por essa razão, o Django automatiza totalmente a criação da interface de administração para os modelos.
+
+O Django foi desenvolvido em um ambiente de redação, onde havia uma clara separação entre “produtores de conteúdo” e o site “público”. Gerentes de site usam o sistema para adicionar notícias, eventos, resultado de esportes, etc, e o conteúdo é exibido no site público. O Django soluciona o problema de criar uma interface unificada para os administradores editarem o conteúdo.
+
+A interface de administração não foi desenvolvida necessariamente para ser usada pelos visitantes do site, mas sim pelos gerentes.
+
+
+## Tornando as Entidades Visíveis no Admin
+
+Para fazer nossos modelos visíveis no site de administração, precisamos dizer ao Django que nosso modelo está registrado. Para fazer isso, edite o arquivo polls/admin.py, que criamos no capítulo anterior, e adicione o seguinte código:
+
+```python
+from django.contrib import admin
+
+from .models import Question
+
+admin.site.register(Question)
+```
+![alt text](image-1.png)
