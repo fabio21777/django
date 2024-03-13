@@ -97,3 +97,9 @@ Veja o guia de templates para maiores detalhes sobre templates.
 
 
 ## Removendo URLs codificados nos templates
+
+```python
+<li><a href="{% url 'detail' question.id %}">{{ question.question_text }}</a></li>
+ ```
+
+A maneira como isso funciona é, observando as definições de URL como especificado no módulo polls.urls. Você pode ver exatamente onde o nome de URL ‘detalhe’ é definido a seguir
