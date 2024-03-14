@@ -82,3 +82,81 @@ Após incrementar uma opção, o código retorna um class:~django.http.HttpRespo
 Como o comentário do Python acima aponta, você deve sempre retornar an HttpResponseRedirectdepois de lidar com sucesso com os dados POST. Esta dica não é específica do Django; é uma boa prática de desenvolvimento web em geral.
 
 Estamos usando a função reverse() no construtor da HttpResponseRedirect neste exemplo. Essa função nos ajuda a evitar de colocar a URL dentro da view de maneira literal. A ele é dado então o nome da “view” que queremos que ele passe o controle e a parte variável do padrão de formato da URL que aponta para a “view”. Neste caso, usando o URLconf nós definimos em Tutorial 3, esta chamada de reverse() irá retornar uma string como
+
+
+Use visualizações genéricas: menos código é melhor
+As visualizações detail()(do Tutorial 3 ) e results() são muito curtas – e, como mencionado acima, redundantes. A index() visualização, que exibe uma lista de enquetes, é semelhante.
+
+Essas visualizações representam um caso comum de desenvolvimento web básico: obter dados do banco de dados de acordo com um parâmetro passado na URL, carregar um template e retornar o template renderizado. Como isso é tão comum, o Django fornece um atalho, chamado de sistema de “visualizações genéricas”.
+
+As visualizações genéricas abstraem padrões comuns a ponto de você nem precisar escrever código Python para escrever um aplicativo. Por exemplo, as visualizações ListViewe DetailViewgenérica abstraem os conceitos de “exibir uma lista de objetos” e “exibir uma página de detalhes para um tipo específico de objeto”, respectivamente.
+
+Vamos converter nosso aplicativo de enquete para usar o sistema de visualizações genéricas, para que possamos excluir vários de nosso próprio código. Teremos que seguir alguns passos para fazer a conversão. Vamos:
+
+Converta o URLconf.
+Exclua algumas das visualizações antigas e desnecessárias.
+Introduza novas visualizações baseadas nas visualizações genéricas do Django.
+Continue lendo para obter detalhes.
+
+
+```python
+from django.urls import path
+
+from . import views
+
+app_name = "polls"
+urlpatterns = [
+    path("", views.IndexView.as_view(), name="index"),
+    path("<int:pk>/", views.DetailView.as_view(), name="detail"),
+    path("<int:pk>/results/", views.ResultsView.as_view(), name="results"),
+    path("<int:question_id>/vote/", views.vote, name="vote"),
+]
+""" Observe que o nome do padrão correspondente nas cadeias de caminho do segundo e terceiro padrões mudou de <question_id>para <pk>. Isso é necessário porque usaremos a DetailViewvisualização genérica para substituir nossas visualizações detail()e results(), e ela espera que o valor da chave primária capturado da URL seja chamado "pk". """
+
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
+from django.views import generic
+
+from .models import Choice, Question
+
+
+class IndexView(generic.ListView):
+    template_name = "polls/index.html"
+    context_object_name = "latest_question_list"
+
+    def get_queryset(self):
+        """Return the last five published questions."""
+        return Question.objects.order_by("-pub_date")[:5]
+
+
+class DetailView(generic.DetailView):
+    model = Question
+    template_name = "polls/detail.html"
+
+
+class ResultsView(generic.DetailView):
+    model = Question
+    template_name = "polls/results.html"
+
+
+def vote(request, question_id):
+    # same as above, no changes needed.
+    ...
+
+
+```python
+
+Cada visão genérica precisa saber em qual modelo irá atuar. Isso é fornecido usando o modelatributo (neste exemplo, for e ) ou definindo o método (conforme mostrado em ).model = QuestionDetailViewResultsViewget_queryset()IndexView
+
+Por padrão, a DetailViewvisualização genérica usa um modelo chamado . No nosso caso, usaria o template . O atributo é usado para dizer ao Django para usar um nome de modelo específico em vez do nome de modelo padrão gerado automaticamente. Também especificamos o para a visualização de lista – isso garante que a visualização de resultados e a visualização de detalhes tenham uma aparência diferente quando renderizadas, mesmo que ambas estejam nos bastidores.<app name>/<model name>_detail.html"polls/question_detail.html"template_nametemplate_nameresultsDetailView
+
+Da mesma forma, a ListViewvisualização genérica usa um modelo padrão chamado ; usamos para dizer para usar nosso modelo existente.<app name>/<model name>_list.htmltemplate_nameListView"polls/index.html"
+
+Nas partes anteriores do tutorial, os modelos receberam um contexto que contém as variáveis ​​de contexto questione latest_question_list . Pois DetailViewa questionvariável é fornecida automaticamente – como estamos usando um modelo Django ( Question), o Django é capaz de determinar um nome apropriado para a variável de contexto. No entanto, para ListView, a variável de contexto gerada automaticamente é question_list. Para substituir isso, fornecemos o context_object_name atributo, especificando o que queremos usar latest_question_list. Como uma abordagem alternativa, você poderia alterar seus templates para corresponderem às novas variáveis ​​de contexto padrão – mas é muito mais fácil dizer ao Django para usar a variável que você deseja.
+
+Execute o servidor e use seu novo aplicativo de pesquisa com base em visualizações genéricas.
+
+Para obter detalhes completos sobre visualizações genéricas, consulte a documentação de visualizações genéricas .
+
+Quando você estiver confortável com formulários e visualizações genéricas, leia a parte 5 deste tutorial para aprender como testar nosso aplicativo de enquetes.
