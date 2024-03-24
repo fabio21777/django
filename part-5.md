@@ -1,22 +1,19 @@
-import datetime
+# part - 5
 
-from django.test import TestCase
-from django.utils import timezone
-
-from .models import Question
-from django.urls import reverse
+Felizmente, há um pequeno bug no pollsaplicativo para corrigirmos imediatamente: o Question.was_published_recently()método retorna Truese o Questionfoi publicado no último dia (o que é correto), mas também se o campo Questiondo pub_dateestá no futuro (o que certamente não é) .
 
 
-class QuestionModelTests(TestCase):
-    def test_was_published_recently_with_future_question(self):
-        """
-        was_published_recently() returns False for questions whose pub_date
-        is in the future.
-        """
-        time = timezone.now() + datetime.timedelta(days=30)
-        future_question = Question(pub_date=time)
-        self.assertIs(future_question.was_published_recently(), False)
+O que aconteceu foi o seguinte:
 
+manage.py test polls procurei testes no pollsaplicativo
+encontrou uma subclasse da django.test.TestCaseclasse
+criou um banco de dados especial para fins de teste
+procurou métodos de teste - aqueles cujos nomes começam comtest
+nele test_was_published_recently_with_future_questioncriou uma Question instância cujo pub_datecampo é 30 dias no futuro
+… e usando o assertIs()método, descobriu que ele was_published_recently()retorna True, embora quiséssemos que ele retornasse False
+O teste nos informa qual teste falhou e até mesmo a linha em que ocorreu a falha.
+
+```python
 def test_was_published_recently_with_old_question(self):
     """
     was_published_recently() returns False for questions whose pub_date
@@ -35,7 +32,11 @@ def test_was_published_recently_with_recent_question(self):
     time = timezone.now() - datetime.timedelta(hours=23, minutes=59, seconds=59)
     recent_question = Question(pub_date=time)
     self.assertIs(recent_question.was_published_recently(), True)
+```
 
+## testando a view
+
+```python
 def create_question(question_text, days):
     """
     Create a question with the given `question_text` and published the
@@ -102,24 +103,18 @@ class QuestionIndexViewTests(TestCase):
             response.context["latest_question_list"],
             [question2, question1],
         )
+```
 
-class QuestionDetailViewTests(TestCase):
-    def test_future_question(self):
-        """
-        The detail view of a question with a pub_date in the future
-        returns a 404 not found.
-        """
-        future_question = create_question(question_text="Future question.", days=5)
-        url = reverse("polls:detail", args=(future_question.id,))
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
 
-    def test_past_question(self):
-        """
-        The detail view of a question with a pub_date in the past
-        displays the question's text.
-        """
-        past_question = create_question(question_text="Past Question.", days=-5)
-        url = reverse("polls:detail", args=(past_question.id,))
-        response = self.client.get(url)
-        self.assertContains(response, past_question.question_text)
+
+Vejamos alguns deles mais de perto.
+
+A primeira é uma função de atalho de pergunta, create_questionpara eliminar algumas repetições do processo de criação de perguntas.
+
+test_no_questionsnão cria nenhuma pergunta, mas verifica a mensagem: “Nenhuma enquete está disponível”. e verifica se latest_question_listestá vazio. Observe que a django.test.TestCaseclasse fornece alguns métodos de asserção adicionais. Nestes exemplos, usamos assertContains()e assertQuerySetEqual().
+
+Em test_past_question, criamos uma pergunta e verificamos se ela aparece na lista.
+
+Em test_future_question, criamos uma pergunta com a pub_date no futuro. O banco de dados é redefinido para cada método de teste, portanto a primeira pergunta não está mais lá e, novamente, o índice não deve conter nenhuma pergunta.
+
+E assim por diante. Na verdade, estamos usando os testes para contar uma história da entrada do administrador e da experiência do usuário no site, e verificando se em cada estado e para cada nova mudança no estado do sistema, os resultados esperados são publicados.
